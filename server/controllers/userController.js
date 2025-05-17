@@ -1,0 +1,168 @@
+// controllers/userController.js - Kullanıcı kontrolleri
+
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+
+// JWT token oluşturma fonksiyonu
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Kullanıcı kaydı
+exports.register = async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    
+    // Kullanıcı adı veya e-posta zaten var mı kontrol et
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }]
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ 
+        message: 'Kayıt hatası', 
+        error: 'Bu kullanıcı adı veya e-posta zaten kullanılıyor' 
+      });
+    }
+    
+    // Yeni kullanıcı oluştur
+    const newUser = new User({
+      username,
+      email,
+      password
+    });
+    
+    await newUser.save();
+    
+    // Token oluştur
+    const token = generateToken(newUser._id);
+    
+    res.status(201).json({
+      message: 'Kullanıcı başarıyla oluşturuldu',
+      token,
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+        preferences: newUser.preferences
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+// Kullanıcı girişi
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    // Kullanıcıyı bul
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(401).json({ message: 'Geçersiz kimlik bilgileri' });
+    }
+    
+    // Parolayı kontrol et
+    const isMatch = await user.comparePassword(password);
+    
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Geçersiz kimlik bilgileri' });
+    }
+    
+    // Token oluştur
+    const token = generateToken(user._id);
+    
+    res.json({
+      message: 'Giriş başarılı',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        preferences: user.preferences
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+// Kullanıcı profilini getir
+exports.getProfile = async (req, res) => {
+  try {
+    // req.user middleware'den geliyor
+    const user = req.user;
+    
+    res.json({
+      id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      preferences: user.preferences,
+      createdAt: user.createdAt
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+// Kullanıcı profilini güncelle
+exports.updateProfile = async (req, res) => {
+  try {
+    const { username, email, preferences } = req.body;
+    const userId = req.userId;
+    
+    // Kullanıcı adı veya e-posta zaten başka bir kullanıcı tarafından kullanılıyor mu kontrol et
+    if (username || email) {
+      const existingUser = await User.findOne({
+        _id: { $ne: userId },
+        $or: [
+          { username },
+          { email }
+        ].filter(Boolean) // undefined olanları filtrele
+      });
+      
+      if (existingUser) {
+        return res.status(400).json({ 
+          message: 'Güncelleme hatası', 
+          error: 'Bu kullanıcı adı veya e-posta zaten kullanılıyor' 
+        });
+      }
+    }
+    
+    // Güncellenecek alanları belirle
+    const updateFields = {};
+    
+    if (username) updateFields.username = username;
+    if (email) updateFields.email = email;
+    if (preferences) updateFields.preferences = preferences;
+    
+    // Kullanıcıyı güncelle
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateFields },
+      { new: true }
+    );
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+    
+    res.json({
+      message: 'Profil başarıyla güncellendi',
+      user: {
+        id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        preferences: updatedUser.preferences
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Sunucu hatası', error: err.message });
+  }
+};
