@@ -1,8 +1,5 @@
-// controllers/aiController.js - AI kontrolleri
-
 const Chat = require('../models/Chat');
 const axios = require('axios');
-
 // AI asistanı için mesaj işleme
 exports.processMessage = async (req, res) => {
   try {
@@ -28,9 +25,11 @@ exports.processMessage = async (req, res) => {
     };
     
     chat.messages.push(userMessage);
-    
+       
+    const limitedMessages = chat.messages.slice(-10);
+
     // AI yanıtını al
-    const aiResponseText = await generateAIResponse(chat.messages);
+    const aiResponseText = await generateAIResponse(limitedMessages);
     
     // AI yanıtını sohbete ekle
     const aiMessage = {
@@ -84,12 +83,9 @@ exports.generateResponse = async (req, res) => {
   }
 };
 
-// AI yanıtı üretme fonksiyonu (istediğiniz AI API'ına göre entegre edilebilir)
+// Güncellenmiş AI yanıtı üretme fonksiyonu
 async function generateAIResponse(messages) {
   try {
-    // Burada mesajları formatlayıp AI servisi API'sine gönderiyoruz
-    // Örnek olarak OpenAI API kullanımı:
-    
     // Mesajları OpenAI formatına dönüştür
     const formattedMessages = messages.map(msg => ({
       role: msg.role,
@@ -104,14 +100,14 @@ async function generateAIResponse(messages) {
       }
     };
     
-    // API isteği gönder
+    // API isteği gönder - token kullanımını optimize edin
     const response = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-3.5-turbo',
         messages: formattedMessages,
         temperature: 0.7,
-        max_tokens: 1000
+        max_tokens: 150,  // Maliyeti azaltmak için cevap uzunluğunu sınırlayın
       },
       config
     );
@@ -120,7 +116,14 @@ async function generateAIResponse(messages) {
     return response.data.choices[0].message.content;
   } catch (error) {
     console.error('AI yanıtı üretme hatası:', error);
-    // Hata durumunda varsayılan bir yanıt döndür
-    return 'Üzgünüm, yanıtınızı işlerken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+    
+    // Hata mesajını ayıkla
+    let errorMessage = 'Üzgünüm, yanıtınızı işlerken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+    
+    if (error.response && error.response.data && error.response.data.error) {
+      console.log('API hata detayı:', error.response.data.error);
+    }
+    
+    return errorMessage;
   }
 }

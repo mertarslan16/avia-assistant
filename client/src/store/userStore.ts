@@ -1,33 +1,50 @@
-// src/store/userStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import axios from 'axios';
+import { useApiStore } from './useApiStore';
 
-// Kullanıcı belleği için arayüz
+// User modeline uygun arayüzler
+export interface UserPreferences {
+  theme: 'light' | 'dark';
+  language: string;
+  notifications: boolean;
+}
+
 export interface UserMemory {
-  topics: Record<string, number>; // Konular ve konuşma sayıları
-  lastInteractions: string[];     // Son etkileşimler
-  likedThings: string[];          // Kullanıcının sevdiği şeyler
-  dislikedThings: string[];       // Kullanıcının sevmediği şeyler
-  mentionedNames: string[];       // Bahsedilen kişiler
-  conversationStyle: {            // Konuşma tarzı
+  topics: Record<string, number>;
+  lastInteractions: string[];
+  likedThings: string[];
+  dislikedThings: string[];
+  mentionedNames: string[];
+  conversationStyle: {
     avgLength: number;
     usesEmoji: boolean;
     formal: boolean;
   };
-  preferences: Record<string, boolean>; // Tercihler
 }
 
 interface UserState {
-  name: string;
-  interests: string;
-  age: string;
-  lastLogin: Date | null;
+  id: string | null;
+  username: string;
+  email: string;
+  role: 'user' | 'admin';
+  preferences: UserPreferences;
+  chatHistory: string[]; // Chat ID'leri
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  isLoggedIn: boolean;
   conversationCount: number;
-  favoriteTopic: string;
   userMemory: UserMemory;
-  setUserInfo: (name: string, interests: string, age?: string) => void;
-  updateConversationCount: () => void;
-  setFavoriteTopic: (topic: string) => void;
+  interests: string;
+  // API işlemleri
+  login: (username: string, password: string) => Promise<boolean>;
+  register: (username: string, email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  updateProfile: (userData: Partial<Omit<UserState, 'userMemory' | 'login' | 'register' | 'logout' | 'updateProfile' | 'updatePreferences' | 'updatePassword' | 'updateMemory' | 'addTopic' | 'addLikedThing' | 'addDislikedThing' | 'addMentionedName' | 'updateConversationStyle'>>) => Promise<boolean>;
+  updatePreferences: (newPreferences: Partial<UserPreferences>) => Promise<boolean>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
+
+  // Bellek fonksiyonları
   updateMemory: (newInfo: Partial<UserMemory>) => void;
   addTopic: (topic: string) => void;
   addLikedThing: (thing: string) => void;
@@ -37,6 +54,7 @@ interface UserState {
 }
 
 const USER_STORAGE_KEY = 'aiva_user_info';
+const API_URL = process.env.NEXT_APP_API_URL || 'http://localhost:8000/api';
 
 // Başlangıç kullanıcı belleği
 const initialMemory: UserMemory = {
@@ -49,37 +67,199 @@ const initialMemory: UserMemory = {
     avgLength: 0,
     usesEmoji: false,
     formal: false
-  },
-  preferences: {}
+  }
+};
+
+// Başlangıç kullanıcı tercihleri
+const initialPreferences: UserPreferences = {
+  theme: 'light',
+  language: 'tr',
+  notifications: true
 };
 
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
-      name: '',
-      interests: '',
-      age: '',
-      lastLogin: null,
+      id: null,
+      username: '',
+      email: '',
+      role: 'user',
+      preferences: initialPreferences,
+      chatHistory: [],
+      createdAt: null,
+      updatedAt: null,
+      isLoggedIn: false,
       conversationCount: 0,
-      favoriteTopic: '',
       userMemory: initialMemory,
+      interests: '',
+      login: async (email: string, password: string) => {
+        try {
+          const apiStore = useApiStore.getState();
+
+          const response = await apiStore.post(`/users/login`, {
+            email,
+            password
+          });
+          console.log("Login response:", response);
+          const userData = response?.user;
+          if (response?.token) {
+            useApiStore.getState().setToken(response.token);
+          }
+          set({
+            id: userData.id,
+            username: userData.username,
+            email: userData.email,
+            role: userData.role,
+            preferences: userData.preferences,
+            chatHistory: userData.chatHistory,
+            createdAt: new Date(userData.createdAt),
+            updatedAt: new Date(userData.updatedAt),
+            isLoggedIn: true
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Login failed:', error);
+          return false;
+        }
+      },
       
-      setUserInfo: (name, interests, age = '') => set({ 
-        name, 
-        interests, 
-        age,
-        lastLogin: new Date() 
-      }),
+      // Kullanıcı kaydı
+      register: async (username: string, email: string, password: string) => {
+        try {
+          const response = await axios.post(`${API_URL}/auth/register`, {
+            username,
+            email,
+            password
+          });
+          
+          const userData = response.data.user;
+          
+          set({
+            id: userData.id,
+            username: userData.username,
+            email: userData.email,
+            role: userData.role,
+            preferences: userData.preferences,
+            chatHistory: userData.chatHistory,
+            createdAt: new Date(userData.createdAt),
+            updatedAt: new Date(userData.updatedAt),
+            isLoggedIn: true
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Registration failed:', error);
+          return false;
+        }
+      },
       
-      updateConversationCount: () => set((state) => ({ 
-        conversationCount: state.conversationCount + 1 
-      })),
+      // Çıkış yap
+      logout: () => {
+        set({
+          id: null,
+          username: '',
+          email: '',
+          role: 'user',
+          preferences: initialPreferences,
+          chatHistory: [],
+          createdAt: null,
+          updatedAt: null,
+          isLoggedIn: false
+        });
+      },
       
-      setFavoriteTopic: (topic) => set({ 
-        favoriteTopic: topic 
-      }),
+      // Profil güncelleme
+      updateProfile: async (userData) => {
+        try {
+          const { id } = get();
+          
+          if (!id) return false;
+          
+          const response = await axios.put(
+            `${API_URL}/users/${id}`,
+            userData,
+            {
+              headers: {
+                Authorization: `Bearer ${useApiStore.getState().token}`
+              }
+            }
+          );
+          
+          const updatedUser = response.data.user;
+          
+          set({
+            username: updatedUser.username,
+            email: updatedUser.email,
+            updatedAt: new Date(updatedUser.updatedAt)
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Profile update failed:', error);
+          return false;
+        }
+      },
       
-      // Belleği güncellemek için yeni fonksiyonlar
+      // Tercihleri güncelleme
+      updatePreferences: async (newPreferences) => {
+        try {
+          const { id, preferences } = get();
+          
+          if (!id) return false;
+          
+          const updatedPreferences = { ...preferences, ...newPreferences };
+          
+          const response = await axios.put(
+            `${API_URL}/users/${id}/preferences`,
+            { preferences: updatedPreferences },
+            {
+              headers: {
+                Authorization: `Bearer ${useApiStore.getState().token}`
+              }
+            }
+          );
+          
+          set({
+            preferences: response.data.preferences,
+            updatedAt: new Date()
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Preferences update failed:', error);
+          return false;
+        }
+      },
+      
+      // Şifre güncelleme
+      updatePassword: async (currentPassword, newPassword) => {
+        try {
+          const { id } = get();
+          
+          if (!id) return false;
+          
+          await axios.put(
+            `${API_URL}/users/${id}/password`,
+            {
+              currentPassword,
+              newPassword
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${useApiStore.getState().token}`
+              }
+            }
+          );
+          
+          return true;
+        } catch (error) {
+          console.error('Password update failed:', error);
+          return false;
+        }
+      },
+      
+      // Belleği güncelleme
       updateMemory: (newInfo) => set((state) => ({
         userMemory: {
           ...state.userMemory,
@@ -87,7 +267,7 @@ export const useUserStore = create<UserState>()(
         }
       })),
       
-      // Yeni bir konu ekle veya var olan konunun sayısını artır
+      // Konu ekleme
       addTopic: (topic) => set((state) => {
         const topics = {...state.userMemory.topics};
         topics[topic] = (topics[topic] || 0) + 1;
@@ -104,7 +284,7 @@ export const useUserStore = create<UserState>()(
         };
       }),
       
-      // Kullanıcının sevdiği şeyleri ekle
+      // Sevilen şey ekleme
       addLikedThing: (thing) => set((state) => {
         if (state.userMemory.likedThings.includes(thing)) {
           return state; // Zaten varsa değişiklik yapma
@@ -118,7 +298,7 @@ export const useUserStore = create<UserState>()(
         };
       }),
       
-      // Kullanıcının sevmediği şeyleri ekle
+      // Sevilmeyen şey ekleme
       addDislikedThing: (thing) => set((state) => {
         if (state.userMemory.dislikedThings.includes(thing)) {
           return state; // Zaten varsa değişiklik yapma
@@ -132,7 +312,7 @@ export const useUserStore = create<UserState>()(
         };
       }),
       
-      // Bahsedilen isimleri ekle
+      // Bahsedilen isim ekleme
       addMentionedName: (name) => set((state) => {
         if (state.userMemory.mentionedNames.includes(name)) {
           return state; // Zaten varsa değişiklik yapma
@@ -146,7 +326,7 @@ export const useUserStore = create<UserState>()(
         };
       }),
       
-      // Kullanıcının konuşma tarzını analiz et ve güncelle
+      // Konuşma tarzını güncelleme
       updateConversationStyle: (message) => set((state) => {
         const currentStyle = state.userMemory.conversationStyle;
         const messageLength = message.length;
@@ -167,6 +347,7 @@ export const useUserStore = create<UserState>()(
                           message.includes('saygılarımla');
         
         return {
+          conversationCount: state.conversationCount + 1,
           userMemory: {
             ...state.userMemory,
             conversationStyle: {
@@ -180,6 +361,17 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: USER_STORAGE_KEY,
+      // Local storage'da saklanacak alanları belirleme
+      partialize: (state) => ({
+        id: state.id,
+        username: state.username,
+        email: state.email,
+        role: state.role,
+        preferences: state.preferences,
+        isLoggedIn: state.isLoggedIn,
+        userMemory: state.userMemory,
+        conversationCount: state.conversationCount
+      })
     }
   )
 );

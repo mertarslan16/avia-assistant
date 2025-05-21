@@ -4,14 +4,14 @@ import { ChatMessage } from './openai';
 
 // Demo AI - OpenAI yerine temel yanıtlar
 export async function getDemoResponse(userMessage: string): Promise<string> {
-  const { name, interests } = useUserStore.getState();
+  const { username, interests } = useUserStore.getState();
   const lowerCaseMessage = userMessage.toLowerCase();
   
   // Temel selamlaşma yanıtları
   if (lowerCaseMessage.includes('merhaba') || 
       lowerCaseMessage.includes('selam') || 
       lowerCaseMessage.includes('sa')) {
-    return `Merhaba ${name || 'dostum'}! Nasılsın bugün?`;
+    return `Merhaba ${username || 'dostum'}! Nasılsın bugün?`;
   }
   
   // İlgi alanlarıyla ilgili yanıtlar
@@ -20,7 +20,7 @@ export async function getDemoResponse(userMessage: string): Promise<string> {
     
     for (const interest of interestList) {
       if (lowerCaseMessage.includes(interest)) {
-        return `${interest.charAt(0).toUpperCase() + interest.slice(1)} hakkında konuşmayı ben de çok seviyorum ${name || 'dostum'}! Bu konuda daha çok sohbet etmek isterim.`;
+        return `${interest.charAt(0).toUpperCase() + interest.slice(1)} hakkında konuşmayı ben de çok seviyorum ${username || 'dostum'}! Bu konuda daha çok sohbet etmek isterim.`;
       }
     }
   }
@@ -29,33 +29,33 @@ export async function getDemoResponse(userMessage: string): Promise<string> {
   if (lowerCaseMessage.includes('nasılsın') || 
       lowerCaseMessage.includes('naber') || 
       lowerCaseMessage.includes('ne haber')) {
-    return `Ben iyiyim ${name || 'dostum'}, teşekkür ederim! Sen nasılsın?`;
+    return `Ben iyiyim ${username || 'dostum'}, teşekkür ederim! Sen nasılsın?`;
   }
   
   // Teşekkür mesajı
   if (lowerCaseMessage.includes('teşekkür') || 
       lowerCaseMessage.includes('sağol')) {
-    return `Rica ederim ${name || 'dostum'}! Yardımcı olabildiysem ne mutlu bana.`;
+    return `Rica ederim ${username || 'dostum'}! Yardımcı olabildiysem ne mutlu bana.`;
   }
   
   // Ne yapabilirsin sorusu
   if (lowerCaseMessage.includes('ne yapabilirsin') || 
       lowerCaseMessage.includes('neler yapabilirsin') || 
       lowerCaseMessage.includes('özellik')) {
-    return `Seninle sohbet edebilir, sorularını yanıtlayabilirim. İlgi alanların hakkında konuşmayı özellikle seviyorum ${name || 'dostum'}.`;
+    return `Seninle sohbet edebilir, sorularını yanıtlayabilirim. İlgi alanların hakkında konuşmayı özellikle seviyorum ${username || 'dostum'}.`;
   }
   
   // Kimsin sorusu
   if (lowerCaseMessage.includes('kimsin') || 
       lowerCaseMessage.includes('adın ne') || 
       lowerCaseMessage.includes('sen nesin')) {
-    return `Ben AIVA, senin kişisel dijital asistanınım ${name || 'dostum'}. Seninle sohbet etmek için buradayım!`;
+    return `Ben AIVA, senin kişisel dijital asistanınım ${username || 'dostum'}. Seninle sohbet etmek için buradayım!`;
   }
   
   // Hava durumu
   if (lowerCaseMessage.includes('hava') && 
      (lowerCaseMessage.includes('nasıl') || lowerCaseMessage.includes('durumu'))) {
-    return `Üzgünüm ${name || 'dostum'}, şu anda hava durumu verilerine erişemiyorum. Ama umarım havan güzeldir!`;
+    return `Üzgünüm ${username || 'dostum'}, şu anda hava durumu verilerine erişemiyorum. Ama umarım havan güzeldir!`;
   }
   
   // Şaka isteği
@@ -75,22 +75,22 @@ export async function getDemoResponse(userMessage: string): Promise<string> {
   if (lowerCaseMessage.includes('üzgün') || 
       lowerCaseMessage.includes('mutsuz') || 
       lowerCaseMessage.includes('kötü hissediyorum')) {
-    return `Bunu duyduğuma üzüldüm ${name || 'dostum'}. Kendine iyi bakmayı unutma. Belki sevdiğin bir şey yaparak moralini yükseltebilirsin?`;
+    return `Bunu duyduğuma üzüldüm ${username || 'dostum'}. Kendine iyi bakmayı unutma. Belki sevdiğin bir şey yaparak moralini yükseltebilirsin?`;
   }
   
   if (lowerCaseMessage.includes('mutlu') || 
       lowerCaseMessage.includes('sevinçli') || 
       lowerCaseMessage.includes('iyi hissediyorum')) {
-    return `Bunu duymak harika ${name || 'dostum'}! Bu güzel duyguyu gün boyu yaşamanı dilerim.`;
+    return `Bunu duymak harika ${username || 'dostum'}! Bu güzel duyguyu gün boyu yaşamanı dilerim.`;
   }
   
   // Rastgele yanıtlar
   const responses = [
-    `Hmm, ilginç bir konu ${name || 'dostum'}. Daha fazla anlatır mısın?`,
-    `Seninle sohbet etmek çok keyifli ${name || 'dostum'}.`,
-    `Bu konuda düşünmem gerek. Sen ne düşünüyorsun ${name || 'dostum'}?`,
-    `Anladım ${name || 'dostum'}. Başka nelerden bahsetmek istersin?`,
-    `Bunu bilmiyordum. Teşekkür ederim paylaştığın için ${name || 'dostum'}.`
+    `Hmm, ilginç bir konu ${username || 'dostum'}. Daha fazla anlatır mısın?`,
+    `Seninle sohbet etmek çok keyifli ${username || 'dostum'}.`,
+    `Bu konuda düşünmem gerek. Sen ne düşünüyorsun ${username || 'dostum'}?`,
+    `Anladım ${username || 'dostum'}. Başka nelerden bahsetmek istersin?`,
+    `Bunu bilmiyordum. Teşekkür ederim paylaştığın için ${username || 'dostum'}.`
   ];
   
   return responses[Math.floor(Math.random() * responses.length)];
