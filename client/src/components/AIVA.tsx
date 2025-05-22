@@ -1,30 +1,21 @@
-// src/components/AIVA.tsx - Hata düzeltmesi ile
+// src/components/AIVA.tsx - Basit versiyon (debugger'lar olmadan)
 'use client';
 import { Canvas } from '@react-three/fiber';
 import { Environment, OrbitControls } from '@react-three/drei';
 import { Suspense, useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useChatStore } from '@/store/chatStore';
-import { speakText, useSpeechStore, SPEECH_EVENTS } from '@/utils/tts';
-import { AivaModel } from './AivaModal'; // İmport ismini kontrol et!
+import { speakText, useSpeechStore } from '@/utils/tts';
+import { AivaModel } from './AivaModal'; 
 import ChatInterface from './ChatInterface';
-import ChatBox from './ChatBox';
-import ModelDebugger from './ModelDebugger'; // Debug aracı import'u
-import { ModelInspectorButton } from './ModelInspector';
-import MouthAnimationDebugger from './MouthAnimationDebugger';
 
 export default function AIVA() {
-  const { username, interests, userMemory, conversationCount, isLoggedIn, logout } = useUserStore();
+  const { username, interests, conversationCount, isLoggedIn, logout } = useUserStore();
   const { chats, fetchChats, isLoading } = useChatStore();
   const [hasSpoken, setHasSpoken] = useState(false);
   const isSpeaking = useSpeechStore((state) => state.isSpeaking);
-  const { audioAnalysis } = useSpeechStore();
   const [modelLoaded, setModelLoaded] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [showMouthDebugger, setShowMouthDebugger] = useState(false);
-
-  // Debug modu (geliştirme sırasında açık tutun, üretimde kapatın)
-  const [debugMode, setDebugMode] = useState(true);
   
   // Sayfa yüklendiğinde yapılacak işlemler
   useEffect(() => {
@@ -46,7 +37,7 @@ export default function AIVA() {
     initializeApp();
   }, [isLoggedIn, fetchChats]);
   
-  // İlk açılışta kullanıcıyı karşıla - ChatInterface'den bağımsız
+  // İlk açılışta kullanıcıyı karşıla
   useEffect(() => {
     const welcomeUser = () => {
       if (username && interests && !hasSpoken && !initialLoading && !isSpeaking) {
@@ -62,49 +53,21 @@ export default function AIVA() {
           welcomeText = `Merhaba ${username}! Nasılsın bugün? İlgi alanların hakkında konuşmayı seviyorum.`;
         }
         
-        // Biraz gecikme ile konuşmayı başlat (modelin yüklenmesi için)
+        // Biraz gecikme ile konuşmayı başlat
         setTimeout(() => {
-          // Eğer başka bir konuşma yoksa karşılama mesajını seslendir
           if (!isSpeaking) {
             speakText(welcomeText);
             setHasSpoken(true);
           }
-        }, 2000); // Biraz daha uzun bir bekleme süresi
+        }, 2000);
       }
     };
     
-    // Model ve sayfa yüklendikten sonra karşılama mesajını seslendir
+    // Model yüklendikten sonra karşılama mesajını seslendir
     if (modelLoaded) {
       welcomeUser();
     }
   }, [username, interests, hasSpoken, conversationCount, chats.length, initialLoading, modelLoaded, isSpeaking]);
-  
-  // Konuşma durumunu takip eden efekt
-  useEffect(() => {
-    const handleSpeechStart = () => {
-      console.log('Konuşma başladı');
-    };
-    
-    const handleSpeechEnd = () => {
-      console.log('Konuşma bitti');
-    };
-    
-    const handleVolumeChange = (event: CustomEvent) => {
-      console.log('Ses seviyesi:', event.detail.volume, 'Fonem:', event.detail.phoneme);
-    };
-    
-    // Olay dinleyicileri ekle
-    window.addEventListener(SPEECH_EVENTS.START, handleSpeechStart);
-    window.addEventListener(SPEECH_EVENTS.END, handleSpeechEnd);
-    window.addEventListener(SPEECH_EVENTS.VOLUME, handleVolumeChange as EventListener);
-    
-    return () => {
-      // Temizlik
-      window.removeEventListener(SPEECH_EVENTS.START, handleSpeechStart);
-      window.removeEventListener(SPEECH_EVENTS.END, handleSpeechEnd);
-      window.removeEventListener(SPEECH_EVENTS.VOLUME, handleVolumeChange as EventListener);
-    };
-  }, []);
   
   // Model yükleme durumunu izleme
   const handleModelLoading = (status: boolean) => {
@@ -112,28 +75,10 @@ export default function AIVA() {
     console.log("3D Model yükleme durumu:", status ? "Yüklendi" : "Yükleniyor");
   };
   
-  // Hafıza bilgilerini görüntüle
-  const getMemoryStats = () => {
-    const topicCount = Object.keys(userMemory.topics || {}).length;
-    const likedCount = userMemory.likedThings?.length || 0;
-    const dislikedCount = userMemory.dislikedThings?.length || 0;
-    const peopleCount = userMemory.mentionedNames?.length || 0;
-    
-    return {
-      topicCount,
-      likedCount,
-      dislikedCount,
-      peopleCount,
-      totalMemories: topicCount + likedCount + dislikedCount + peopleCount
-    };
-  };
-  
-  const memoryStats = getMemoryStats();
-  
   // Çıkış işlemi
   const handleLogout = () => {
     logout();
-    window.location.reload(); // Sayfayı yenile
+    window.location.reload();
   };
   
   // Yükleme göstergesi
@@ -156,7 +101,6 @@ export default function AIVA() {
         <h1 className="text-3xl font-bold text-white">
           AIVA - Kişiselleştirilmiş Yapay Zeka Asistanınız
         </h1>
-        <ModelInspectorButton />
         <div className="flex items-center space-x-4">
           {isLoggedIn && (
             <>
@@ -169,26 +113,9 @@ export default function AIVA() {
               </button>
             </>
           )}
-          
-          {/* Debug modu düğmesi */}
-          <button
-          onClick={() => setDebugMode(!debugMode)}
-          className="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600 text-sm mr-2"
-          title="Debug modunu aç/kapa"
-        >
-          {debugMode ? 'Debug: Açık' : 'Debug: Kapalı'}
-        </button>
-        <button
-          onClick={() => setShowMouthDebugger(!showMouthDebugger)}
-          className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-          title="Ağız animasyonu ayarlarını aç/kapa"
-        >
-          {showMouthDebugger ? 'Ağız Debugger: Açık' : 'Ağız Debugger: Kapalı'}
-        </button>
         </div>
       </div>
       
-      {!isLoggedIn && !username ? <ChatBox /> : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* 3D Model */}
           <div className="w-full h-[500px] bg-gray-900 rounded-xl overflow-hidden relative">
@@ -221,43 +148,42 @@ export default function AIVA() {
               }>
                 <AivaModel 
                   speaking={isSpeaking} 
-                  mouthOpenness={audioAnalysis.volume > 0 ? audioAnalysis.volume : 0.3} // Konuşurken minimum değer
                   onLoaded={() => handleModelLoading(true)} 
                 />
-                <Environment preset="studio" intensity={0.5} />
+                <Environment preset="studio"/>
                 <OrbitControls 
                   enableZoom={false}
                   enablePan={false}
-                  enableRotate={true} // Debug için rotasyonu etkinleştir
-                  minPolarAngle={Math.PI/3}  // Daha fazla rotasyon izni
+                  enableRotate={true}
+                  minPolarAngle={Math.PI/3}
                   maxPolarAngle={Math.PI/1.5}
                 />
               </Suspense>
             </Canvas>
             
-              <div className="absolute bottom-2 left-2 right-2 text-white p-2 bg-black bg-opacity-50 rounded text-sm">
-                {isSpeaking ? (
-                  <p className="animate-pulse">
-                    Konuşuyor... 🔊 <span className="text-xs">Fonem: {audioAnalysis.phoneme}</span>
+            <div className="absolute bottom-2 left-2 right-2 text-white p-2 bg-black bg-opacity-50 rounded text-sm">
+              {isSpeaking ? (
+                <p className="animate-pulse">
+                  Konuşuyor... 🔊
+                </p>
+              ) : (
+                <div>
+                  <p>
+                    Merhaba {username}!
                   </p>
-                ) : (
-                  <div>
-                    <p>
-                      Merhaba {username}!
-                    </p>
-                  </div>
-                )}
-              </div>
-                        
-            {/* Model yükleme göstergesi */}
-             {!modelLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="text-white text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                    <p>3D Model Yükleniyor...</p>
-                  </div>
                 </div>
               )}
+            </div>
+                        
+            {/* Model yükleme göstergesi */}
+            {!modelLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="text-white text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p>3D Model Yükleniyor...</p>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Sohbet Arayüzü */}
@@ -265,21 +191,14 @@ export default function AIVA() {
             <ChatInterface />
           </div>
         </div>
-      )}
+
       
-      {/* Hata durumunda veya yükleme sırasında genel bilgi mesajı */}
+      {/* Yükleme mesajı */}
       {isLoading && (
         <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
           İşleniyor...
         </div>
       )}
-      {showMouthDebugger && (
-      <MouthAnimationDebugger 
-        onClose={() => setShowMouthDebugger(false)}
-        />
-    )}
-      {/* Debug paneli (sadece debug modu açık olduğunda göster) */}
-      {debugMode && <ModelDebugger />}
     </div>
   );
 }

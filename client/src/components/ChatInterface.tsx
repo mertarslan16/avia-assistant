@@ -1,4 +1,3 @@
-// src/components/ChatInterface.tsx - Mesaj seslendirme sorunu düzeltildi
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -40,13 +39,11 @@ export default function ChatInterface() {
 
   // Yeni bir mesaj geldiğinde seslendir
   useEffect(() => {
-    // currentChat ve mesajları varsa
     if (currentChat?.messages && currentChat.messages.length > 0) {
       const lastMessage = currentChat.messages[currentChat.messages.length - 1];
       
       // Eğer son mesaj asistandan geldiyse ve yükleme işlemi bittiyse seslendir
       if (lastMessage.role === 'assistant' && !isLoading) {
-        // Burada bir setTimeout kullanarak mesajın UI'da görünmesini bekleyelim
         setTimeout(() => {
           speakText(lastMessage.content);
         }, 300);
@@ -59,7 +56,6 @@ export default function ChatInterface() {
     try {
       await fetchChats();
       
-      // Aktif bir sohbet yoksa ve sohbet listesi doluysa ilk sohbeti seç
       if (!currentChat && chats.length > 0) {
         await fetchChatById(chats[0]._id);
       }
@@ -101,27 +97,18 @@ export default function ChatInterface() {
 
   // Mesaj gönder
   const handleSubmit = async (): Promise<void> => {
-    // Boş mesaj kontrolü
     if (!message.trim()) return;
     
     try {
-      // Aktif sohbet yoksa yeni oluştur ve tekrar dene
       if (!currentChat) {
         await handleCreateNewChat();
-        // Oluşturma işlemi tamamlanana kadar bekle ve sonra yine dene
         setTimeout(() => {
           handleSubmit();
         }, 500);
         return;
       }
       
-      // Mesajı gönder ve yanıt al
       await sendMessage(message.trim());
-      
-      // AI yanıtının seslendirilmesi useEffect ile yapılacak
-      // speakText komutunu buradan kaldırdık
-      
-      // Mesaj kutusunu temizle
       setMessage('');
       
     } catch (err) {
@@ -172,7 +159,7 @@ export default function ChatInterface() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-w-6xl mx-auto bg-gray-800 rounded-xl overflow-hidden">
-      {/* Sohbet Listesi (Soldaki Sidebar) */}
+      {/* Sohbet Listesi */}
       <div className="p-4 bg-gray-900 md:col-span-1 order-2 md:order-1">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-white text-lg font-semibold">Sohbetler</h2>
@@ -219,7 +206,7 @@ export default function ChatInterface() {
         </div>
       </div>
       
-      {/* Sohbet Alanı (Sağdaki Ana Alan) */}
+      {/* Sohbet Alanı */}
       <div className="md:col-span-3 p-0 flex flex-col h-[600px] order-1 md:order-2">
         {/* Mesaj Geçmişi */}
         <div className="flex-grow overflow-y-auto p-4 bg-gray-800">
@@ -299,7 +286,7 @@ export default function ChatInterface() {
             </button>
           </div>
           
-          {/* Sohbet başlığı düzenleme ve istatistikleri */}
+          {/* Sohbet bilgileri */}
           {currentChat && (
             <div className="mt-2 flex justify-between text-xs text-gray-400">
               <div>
