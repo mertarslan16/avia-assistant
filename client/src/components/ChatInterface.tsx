@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useChatStore } from '@/store/chatStore';
-import { speakText, useSpeechStore } from '@/utils/tts';
+import { speakText, speakLastMessage, useSpeechStore } from '@/utils/tts';
 
 export default function ChatInterface() {
   const [message, setMessage] = useState<string>('');
@@ -30,6 +30,7 @@ export default function ChatInterface() {
   // Sohbetleri yükle
   useEffect(() => {
     loadChats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Mesajları otomatik kaydır
@@ -37,13 +38,26 @@ export default function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentChat?.messages]);
 
-  // Yeni bir mesaj geldiğinde seslendir
+  // Yeni bir mesaj geldiğinde seslendir ve kaydet
   useEffect(() => {
     if (currentChat?.messages && currentChat.messages.length > 0) {
       const lastMessage = currentChat.messages[currentChat.messages.length - 1];
       
-      // Eğer son mesaj asistandan geldiyse ve yükleme işlemi bittiyse seslendir
+      // Eğer son mesaj asistandan geldiyse
       if (lastMessage.role === 'assistant' && !isLoading) {
+        // LocalStorage'a son mesajı kaydet
+        try {
+          localStorage.setItem('lastChatMessage', JSON.stringify({
+            content: lastMessage.content,
+            role: lastMessage.role,
+            timestamp: lastMessage.timestamp || new Date().toISOString()
+          }));
+          console.log("💾 Son asistan mesajı kaydedildi");
+        } catch (error) {
+          console.error("❌ Mesaj kaydetme hatası:", error);
+        }
+        
+        // Viseme ile seslendir
         setTimeout(() => {
           speakText(lastMessage.content);
         }, 300);
@@ -140,6 +154,12 @@ export default function ChatInterface() {
     }
   };
 
+  // Son mesajı tekrar oku
+  const handleRepeatLastMessage = () => {
+    console.log("🔄 Son mesaj tekrar okunuyor...");
+    speakLastMessage();
+  };
+
   // Hata mesajlarını göster/gizle
   const ErrorMessage = () => {
     if (!error) return null;
@@ -163,14 +183,24 @@ export default function ChatInterface() {
       <div className="p-4 bg-gray-900 md:col-span-1 order-2 md:order-1">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-white text-lg font-semibold">Sohbetler</h2>
-          <button 
-            onClick={handleCreateNewChat}
-            disabled={isLoading}
-            className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
-            title="Yeni sohbet oluştur"
-          >
-            {isLoading ? '...' : '+ Yeni'}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleCreateNewChat}
+              disabled={isLoading}
+              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-xs"
+              title="Yeni sohbet oluştur"
+            >
+              + Yeni
+            </button>
+            <button 
+              onClick={handleRepeatLastMessage}
+              disabled={isSpeaking}
+              className="p-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-xs"
+              title="Son mesajı tekrar oku"
+            >
+              🔄 Oku
+            </button>
+          </div>
         </div>
         
         <ErrorMessage />
@@ -244,6 +274,16 @@ export default function ChatInterface() {
                   }`}
                 >
                   {msg.content}
+                  {msg.role === 'assistant' && (
+                    <button
+                      onClick={() => speakText(msg.content)}
+                      disabled={isSpeaking}
+                      className="ml-2 text-xs bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded"
+                      title="Bu mesajı oku"
+                    >
+                      🔊
+                    </button>
+                  )}
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
                   <span>{msg.role === 'user' ? username || 'Sen' : 'AIVA'}</span>
@@ -284,6 +324,14 @@ export default function ChatInterface() {
             >
               {isLoading ? 'Yanıt Bekleniyor...' : isSpeaking ? 'Konuşuyor...' : 'Gönder'}
             </button>
+          </div>
+          
+          {/* Viseme Debug Paneli */}
+          <div className="mt-2 text-xs text-gray-400">
+            <div className="flex justify-between items-center">
+              <span>Viseme Sistemi Aktif ✓</span>
+              <span>Harf bazlı ağız animasyonu</span>
+            </div>
           </div>
           
           {/* Sohbet bilgileri */}

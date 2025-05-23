@@ -1,11 +1,11 @@
-// src/components/AIVA.tsx - Basit versiyon (debugger'lar olmadan)
+// src/components/AIVA.tsx - İyileştirilmiş versiyon
 'use client';
 import { Canvas } from '@react-three/fiber';
 import { Environment, OrbitControls } from '@react-three/drei';
 import { Suspense, useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useChatStore } from '@/store/chatStore';
-import { speakText, useSpeechStore } from '@/utils/tts';
+import { speakText, useSpeechStore, testVisemes, enableSpeech } from '@/utils/tts';
 import { AivaModel } from './AivaModal'; 
 import ChatInterface from './ChatInterface';
 
@@ -13,9 +13,10 @@ export default function AIVA() {
   const { username, interests, conversationCount, isLoggedIn, logout } = useUserStore();
   const { chats, fetchChats, isLoading } = useChatStore();
   const [hasSpoken, setHasSpoken] = useState(false);
-  const isSpeaking = useSpeechStore((state) => state.isSpeaking);
+  const { isSpeaking, currentViseme, visemeIntensity, currentText, userInteracted } = useSpeechStore();
   const [modelLoaded, setModelLoaded] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [showDebug, setShowDebug] = useState(false);
   
   // Sayfa yüklendiğinde yapılacak işlemler
   useEffect(() => {
@@ -40,17 +41,15 @@ export default function AIVA() {
   // İlk açılışta kullanıcıyı karşıla
   useEffect(() => {
     const welcomeUser = () => {
-      if (username && interests && !hasSpoken && !initialLoading && !isSpeaking) {
-        // İlk veya yeni kullanıcı karşılama mesajı
+      if (username && interests && !hasSpoken && !initialLoading && !isSpeaking && modelLoaded) {
         let welcomeText = '';
         
         if (conversationCount < 3) {
-          welcomeText = `Merhaba ${username}! İlgi alanlarını çok seviyorum: ${interests}. Seninle tanışmak güzel!`;
+          welcomeText = `Merhaba ${username}! Ben AIVA, senin kişisel yapay zeka asistanın. İlgi alanların gerçekten çok güzel: ${interests}. Seninle tanışmak harika!`;
         } else if (chats.length > 0 && conversationCount > 10) {
-          // Düzenli kullanıcı için daha kişisel karşılama
-          welcomeText = `Tekrar merhaba ${username}! Seni yeniden görmek güzel. Bugün nasıl yardımcı olabilirim?`;
+          welcomeText = `Tekrar merhaba ${username}! Seni yeniden görmek ne güzel. Bugün sana nasıl yardımcı olabilirim?`;
         } else {
-          welcomeText = `Merhaba ${username}! Nasılsın bugün? İlgi alanların hakkında konuşmayı seviyorum.`;
+          welcomeText = `Merhaba ${username}! Bugün nasılsın? İlgi alanların hakkında konuşmayı çok seviyorum.`;
         }
         
         // Biraz gecikme ile konuşmayı başlat
@@ -63,7 +62,6 @@ export default function AIVA() {
       }
     };
     
-    // Model yüklendikten sonra karşılama mesajını seslendir
     if (modelLoaded) {
       welcomeUser();
     }
@@ -72,7 +70,6 @@ export default function AIVA() {
   // Model yükleme durumunu izleme
   const handleModelLoading = (status: boolean) => {
     setModelLoaded(status);
-    console.log("3D Model yükleme durumu:", status ? "Yüklendi" : "Yükleniyor");
   };
   
   // Çıkış işlemi
@@ -106,6 +103,12 @@ export default function AIVA() {
             <>
               <span className="text-white">{username || 'Kullanıcı'}</span>
               <button 
+                onClick={() => setShowDebug(!showDebug)}
+                className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+              >
+                {showDebug ? 'Debug Gizle' : 'Debug Göster'}
+              </button>
+              <button 
                 onClick={handleLogout}
                 className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
               >
@@ -116,87 +119,190 @@ export default function AIVA() {
         </div>
       </div>
       
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* 3D Model */}
-          <div className="w-full h-[500px] bg-gray-900 rounded-xl overflow-hidden relative">
-            <Canvas 
-              camera={{ 
-                position: [0, 0, 2], 
-                fov: 20,
-                near: 0.1,
-                far: 1000
-              }}
-            >
-              {/* Temel ışıklandırma */}
-              <ambientLight intensity={0.8} />
-              <directionalLight position={[5, 5, 5]} intensity={0.8} />
-              
-              {/* Yüze doğrultulmuş ek ışık */}
-              <spotLight 
-                position={[0, 1, 4]} 
-                angle={0.3} 
-                penumbra={0.5} 
-                intensity={1.0} 
-                color="#ffffff" 
-              />
-              
-              <Suspense fallback={
-                <mesh>
-                  <boxGeometry args={[1, 1, 1]} />
-                  <meshStandardMaterial color="hotpink" />
-                </mesh>
-              }>
-                <AivaModel 
-                  speaking={isSpeaking} 
-                  onLoaded={() => handleModelLoading(true)} 
-                />
-                <Environment preset="studio"/>
-                <OrbitControls 
-                  enableZoom={false}
-                  enablePan={false}
-                  enableRotate={true}
-                  minPolarAngle={Math.PI/3}
-                  maxPolarAngle={Math.PI/1.5}
-                />
-              </Suspense>
-            </Canvas>
-            
-            <div className="absolute bottom-2 left-2 right-2 text-white p-2 bg-black bg-opacity-50 rounded text-sm">
-              {isSpeaking ? (
-                <p className="animate-pulse">
-                  Konuşuyor... 🔊
-                </p>
-              ) : (
-                <div>
-                  <p>
-                    Merhaba {username}!
-                  </p>
-                </div>
-              )}
+      {/* Debug Paneli */}
+      {showDebug && (
+        <div className="mb-6 p-4 bg-gray-800 rounded-lg text-white text-sm">
+          <h3 className="font-bold mb-2">🔧 Debug Paneli</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <strong>Konuşma Durumu:</strong><br/>
+              {isSpeaking ? '🔊 Konuşuyor' : '🔇 Sessiz'}
             </div>
-                        
-            {/* Model yükleme göstergesi */}
-            {!modelLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                <div className="text-white text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                  <p>3D Model Yükleniyor...</p>
+            <div>
+              <strong>Kullanıcı Etkileşimi:</strong><br/>
+              {userInteracted ? '✅ Aktif' : '❌ Pasif'}
+            </div>
+            <div>
+              <strong>Aktif Viseme:</strong><br/>
+              V{currentViseme} ({visemeIntensity.toFixed(2)})
+            </div>
+            <div>
+              <strong>Model Durumu:</strong><br/>
+              {modelLoaded ? '✅ Yüklendi' : '⏳ Yükleniyor'}
+            </div>
+          </div>
+          <div className="mt-2">
+            <strong>Aktif Metin:</strong> {currentText.substring(0, 50)}...
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button 
+              onClick={() => testVisemes()}
+              className="px-2 py-1 bg-green-600 rounded text-xs hover:bg-green-700"
+            >
+              Test Visemes
+            </button>
+            <button 
+              onClick={() => enableSpeech()}
+              className="px-2 py-1 bg-blue-600 rounded text-xs hover:bg-blue-700"
+            >
+              TTS Etkinleştir
+            </button>
+            <button 
+              onClick={() => speakText("Merhaba, bu bir test mesajıdır. Ağız animasyonumu test ediyorum.")}
+              disabled={isSpeaking}
+              className="px-2 py-1 bg-yellow-600 rounded text-xs hover:bg-yellow-700 disabled:bg-gray-600"
+            >
+              Test Konuşması
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* 3D Model */}
+        <div className="w-full h-[500px] bg-gray-900 rounded-xl overflow-hidden relative">
+          <Canvas 
+            camera={{ 
+              position: [0, 0, 2], 
+              fov: 20,
+              near: 0.1,
+              far: 1000
+            }}
+          >
+            {/* Geliştirilmiş ışıklandırma */}
+            <ambientLight intensity={0.6} />
+            <directionalLight position={[5, 5, 5]} intensity={0.8} />
+            <directionalLight position={[-5, 5, 5]} intensity={0.4} />
+            
+            {/* Yüze odaklı ışık */}
+            <spotLight 
+              position={[0, 1, 4]} 
+              angle={0.3} 
+              penumbra={0.5} 
+              intensity={1.2} 
+              color="#ffffff" 
+            />
+            
+            {/* Alt aydınlatma */}
+            <pointLight position={[0, -2, 2]} intensity={0.3} color="#4fc3f7" />
+            
+            <Suspense fallback={
+              <mesh>
+                <sphereGeometry args={[0.5, 32, 32]} />
+                <meshStandardMaterial color="#4fc3f7" />
+              </mesh>
+            }>
+              <AivaModel 
+                speaking={isSpeaking} 
+                onLoaded={() => handleModelLoading(true)} 
+              />
+              <Environment preset="studio"/>
+              <OrbitControls 
+                enableZoom={true}
+                enablePan={false}
+                enableRotate={true}
+                minDistance={1}
+                maxDistance={5}
+                minPolarAngle={Math.PI/4}
+                maxPolarAngle={Math.PI/1.2}
+              />
+            </Suspense>
+          </Canvas>
+          
+          {/* Durum Göstergesi */}
+          <div className="absolute bottom-2 left-2 right-2 text-white p-3 bg-black bg-opacity-70 rounded text-sm">
+            {isSpeaking ? (
+              <div className="flex items-center justify-between">
+                <p className="animate-pulse flex items-center">
+                  🔊 Konuşuyor... 
+                  <span className="ml-2 text-xs">
+                    V{currentViseme} ({visemeIntensity.toFixed(1)})
+                  </span>
+                </p>
+                <div className="flex space-x-1">
+                  {[...Array(5)].map((_, i) => (
+                    <div 
+                      key={i}
+                      className={`w-1 h-4 bg-blue-400 rounded animate-pulse`}
+                      style={{
+                        animationDelay: `${i * 0.1}s`,
+                        opacity: visemeIntensity > i * 0.2 ? 1 : 0.3
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p>
+                  {username ? `Merhaba ${username}! 👋` : 'Merhaba! 👋'}
+                </p>
+                <div className="text-xs text-gray-300">
+                  {modelLoaded ? '✅ Hazır' : '⏳ Yükleniyor'}
                 </div>
               </div>
             )}
           </div>
           
-          {/* Sohbet Arayüzü */}
+          {/* Model yükleme göstergesi */}
+          {!modelLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70">
+              <div className="text-white text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                <p>3D Model Yükleniyor...</p>
+                <p className="text-xs text-gray-300 mt-1">Facial rigging sistemi hazırlanıyor</p>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Sohbet Arayüzü */}
+        <div>
+          <ChatInterface />
+        </div>
+      </div>
+
+      {/* Alt Bilgi Paneli */}
+      <div className="mt-8 p-4 bg-gray-800 rounded-lg text-white text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <ChatInterface />
+            <h4 className="font-bold mb-2">🎭 Viseme Sistemi</h4>
+            <p>11 farklı ağız pozisyonu</p>
+            <p>Türkçe karakter desteği</p>
+            <p>Gerçek zamanlı animasyon</p>
+          </div>
+          <div>
+            <h4 className="font-bold mb-2">🤖 AI Özellikleri</h4>
+            <p>OpenAI GPT entegrasyonu</p>
+            <p>Kişiselleştirilmiş cevaplar</p>
+            <p>Sohbet geçmişi</p>
+          </div>
+          <div>
+            <h4 className="font-bold mb-2">🔊 Ses Özellikleri</h4>
+            <p>Türkçe Text-to-Speech</p>
+            <p>Gerçek zamanlı lip sync</p>
+            <p>Adaptif ses analizi</p>
           </div>
         </div>
-
+      </div>
       
       {/* Yükleme mesajı */}
       {isLoading && (
         <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
-          İşleniyor...
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+            İşleniyor...
+          </div>
         </div>
       )}
     </div>
