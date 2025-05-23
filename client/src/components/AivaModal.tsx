@@ -199,16 +199,16 @@ export function AivaModel({ onLoaded }: AivaModelProps) {
   const calculateMouthOpenness = (viseme: number, intensity: number): number => {
     const baseOpenness = {
       0: 0,      // Kapalı
-      1: 0.1,    // f, v
-      2: 0.15,   // s, z, h
-      3: 0.25,   // ş, ç, c, j
-      4: 0.2,    // d, l, n, r, t
-      5: 0.1,    // g, k, ğ
-      6: 0.6,    // a - en açık
-      7: 0.4,    // e
-      8: 0.2,    // ı, i
-      9: 0.35,   // o, ö
-      10: 0.3,   // u, ü
+      1: 0.05,   // f, v - çok küçük
+      2: 0.08,   // s, z, h - küçük
+      3: 0.12,   // ş, ç, c, j - orta
+      4: 0.1,    // d, l, n, r, t - küçük
+      5: 0.05,   // g, k, ğ - çok küçük
+      6: 0.25,   // a - orta açık (daha az)
+      7: 0.2,    // e - orta
+      8: 0.1,    // ı, i - küçük
+      9: 0.18,   // o, ö - orta
+      10: 0.15,  // u, ü - küçük orta
     };
     
     return (baseOpenness[viseme as keyof typeof baseOpenness] || 0) * intensity;
@@ -241,12 +241,12 @@ export function AivaModel({ onLoaded }: AivaModelProps) {
       console.log(`👄 Ağız açıklığı değişti: ${oldOpenness.toFixed(3)} → ${currentMouthOpenness.current.toFixed(3)}`);
     }
     
-    // Çene bone'unu hareket ettir
+    // Çene bone'unu hareket ettir (daha az hareket)
     if (activeBones.current.jaw) {
       const originalRot = originalRotations.current[activeBones.current.jaw.name];
       if (originalRot) {
-        // X ekseni rotasyonu (ağız açma/kapama)
-        activeBones.current.jaw.rotation.x = originalRot.x + currentMouthOpenness.current;
+        // X ekseni rotasyonu (ağız açma/kapama) - çok daha az hareket
+        activeBones.current.jaw.rotation.x = originalRot.x + currentMouthOpenness.current * 0.3;
         
         // Matrisi güncelle
         activeBones.current.jaw.updateMatrixWorld(true);
@@ -258,44 +258,56 @@ export function AivaModel({ onLoaded }: AivaModelProps) {
       }
     }
     
-    // Ağız bone'unu hareket ettir
+    // Ağız bone'unu hareket ettir (ana dudak hareketi)
     if (activeBones.current.mouth) {
       const originalRot = originalRotations.current[activeBones.current.mouth.name];
-      if (originalRot) {
-        // Dudaklar için daha küçük hareket
-        activeBones.current.mouth.rotation.x = originalRot.x + currentMouthOpenness.current * 0.5;
+      const originalPos = originalPositions.current[activeBones.current.mouth.name];
+      
+      if (originalRot && originalPos) {
+        // Hem rotasyon hem pozisyon ile dudak açıklığı
+        activeBones.current.mouth.rotation.x = originalRot.x + currentMouthOpenness.current * 0.8;
+        // Y pozisyonu ile dudakları ayır
+        activeBones.current.mouth.position.y = originalPos.y + currentMouthOpenness.current * 0.02;
         activeBones.current.mouth.updateMatrixWorld(true);
         
         if (Math.random() < 0.05 && currentMouthOpenness.current > 0.01) {
-          console.log(`👄 Ağız hareketi: ${activeBones.current.mouth.name}, Rotasyon X: ${activeBones.current.mouth.rotation.x.toFixed(3)}`);
+          console.log(`👄 Ağız hareketi: ${activeBones.current.mouth.name}, Rot X: ${activeBones.current.mouth.rotation.x.toFixed(3)}, Pos Y: ${activeBones.current.mouth.position.y.toFixed(3)}`);
         }
       }
     }
     
-    // Üst dudak bone'unu hareket ettir
+    // Üst dudak bone'unu hareket ettir (yukarı ve geriye)
     if (activeBones.current.upperLip) {
       const originalRot = originalRotations.current[activeBones.current.upperLip.name];
-      if (originalRot) {
-        // Üst dudak yukarı hareket
-        activeBones.current.upperLip.rotation.x = originalRot.x - currentMouthOpenness.current * 0.3;
+      const originalPos = originalPositions.current[activeBones.current.upperLip.name];
+      
+      if (originalRot && originalPos) {
+        // Üst dudak yukarı ve hafif geriye
+        activeBones.current.upperLip.rotation.x = originalRot.x - currentMouthOpenness.current * 0.6;
+        activeBones.current.upperLip.position.y = originalPos.y + currentMouthOpenness.current * 0.03;
+        activeBones.current.upperLip.position.z = originalPos.z - currentMouthOpenness.current * 0.01;
         activeBones.current.upperLip.updateMatrixWorld(true);
         
         if (Math.random() < 0.05 && currentMouthOpenness.current > 0.01) {
-          console.log(`👄 Üst dudak hareketi: ${activeBones.current.upperLip.name}, Rotasyon X: ${activeBones.current.upperLip.rotation.x.toFixed(3)}`);
+          console.log(`👄 Üst dudak: Rot X: ${activeBones.current.upperLip.rotation.x.toFixed(3)}, Pos Y: ${activeBones.current.upperLip.position.y.toFixed(3)}`);
         }
       }
     }
     
-    // Alt dudak bone'unu hareket ettir
+    // Alt dudak bone'unu hareket ettir (aşağı ve hafif ileri)
     if (activeBones.current.lowerLip) {
       const originalRot = originalRotations.current[activeBones.current.lowerLip.name];
-      if (originalRot) {
-        // Alt dudak aşağı hareket
-        activeBones.current.lowerLip.rotation.x = originalRot.x + currentMouthOpenness.current * 0.4;
+      const originalPos = originalPositions.current[activeBones.current.lowerLip.name];
+      
+      if (originalRot && originalPos) {
+        // Alt dudak aşağı ve hafif ileri
+        activeBones.current.lowerLip.rotation.x = originalRot.x + currentMouthOpenness.current * 0.7;
+        activeBones.current.lowerLip.position.y = originalPos.y - currentMouthOpenness.current * 0.04;
+        activeBones.current.lowerLip.position.z = originalPos.z + currentMouthOpenness.current * 0.015;
         activeBones.current.lowerLip.updateMatrixWorld(true);
         
         if (Math.random() < 0.05 && currentMouthOpenness.current > 0.01) {
-          console.log(`👄 Alt dudak hareketi: ${activeBones.current.lowerLip.name}, Rotasyon X: ${activeBones.current.lowerLip.rotation.x.toFixed(3)}`);
+          console.log(`👄 Alt dudak: Rot X: ${activeBones.current.lowerLip.rotation.x.toFixed(3)}, Pos Y: ${activeBones.current.lowerLip.position.y.toFixed(3)}`);
         }
       }
     }
