@@ -145,6 +145,17 @@ exports.addMessage = async (req, res) => {
       return res.status(404).json({ message: 'Sohbet bulunamadı' });
     }
     
+    // Kullanıcının toplam mesaj sayısını kontrol et
+    const userMessages = chat.messages.filter(msg => msg.role === 'user').length;
+    
+    // Eğer kullanıcı mesajı ise ve limit aşıldıysa hata döndür
+    if (role === 'user' && userMessages >= 10) {
+      return res.status(403).json({ 
+        message: 'Mesaj limiti aşıldı', 
+        error: 'Bir sohbette en fazla 10 mesaj gönderebilirsiniz' 
+      });
+    }
+    
     const newMessage = {
       content,
       role,
@@ -158,7 +169,8 @@ exports.addMessage = async (req, res) => {
     
     res.status(201).json({
       message: 'Mesaj başarıyla eklendi',
-      chatMessage: newMessage
+      chatMessage: newMessage,
+      remainingMessages: role === 'user' ? 10 - (userMessages + 1) : null
     });
   } catch (err) {
     res.status(500).json({ message: 'Sunucu hatası', error: err.message });

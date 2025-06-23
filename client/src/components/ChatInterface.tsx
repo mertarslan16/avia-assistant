@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useChatStore } from '@/store/chatStore';
-import { speakText, speakLastMessage, useSpeechStore } from '@/utils/tts';
+import { speakText, useSpeechStore } from '@/utils/tts';
 
 export default function ChatInterface() {
   const [message, setMessage] = useState<string>('');
+  const [alert, setAlert] = useState<{type: 'success' | 'error' | 'warning' | 'info', message: string} | null>(null);
   
   // Store'lardan veriler
   const { username } = useUserStore();
@@ -26,6 +27,23 @@ export default function ChatInterface() {
   
   const isSpeaking = useSpeechStore((state) => state.isSpeaking);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Alert gösterme fonksiyonu
+  const showAlert = (type: 'success' | 'error' | 'warning' | 'info', message: string, duration = 5000) => {
+    setAlert({ type, message });
+    
+    // Belirli bir süre sonra alert'i kaldır
+    setTimeout(() => {
+      setAlert(null);
+    }, duration);
+  };
+
+  // Hata durumunda alert göster
+  useEffect(() => {
+    if (error) {
+      showAlert('error', error);
+    }
+  }, [error]);
 
   // Sohbetleri yükle
   useEffect(() => {
@@ -52,15 +70,9 @@ export default function ChatInterface() {
             role: lastMessage.role,
             timestamp: lastMessage.timestamp || new Date().toISOString()
           }));
-          console.log("💾 Son asistan mesajı kaydedildi");
         } catch (error) {
           console.error("❌ Mesaj kaydetme hatası:", error);
         }
-        
-        // Viseme ile seslendir
-        setTimeout(() => {
-          speakText(lastMessage.content);
-        }, 300);
       }
     }
   }, [currentChat?.messages, isLoading]);
@@ -75,6 +87,7 @@ export default function ChatInterface() {
       }
     } catch (err) {
       console.error("Sohbetleri yükleme hatası:", err);
+      showAlert('error', 'Sohbetleri yüklerken bir hata oluştu.');
     }
   };
 
@@ -82,8 +95,10 @@ export default function ChatInterface() {
   const handleCreateNewChat = async (): Promise<void> => {
     try {
       await createChat(`Sohbet ${chats.length + 1}`);
+      showAlert('success', 'Yeni sohbet oluşturuldu!');
     } catch (err) {
       console.error("Sohbet oluşturma hatası:", err);
+      showAlert('error', 'Sohbet oluşturulurken bir hata oluştu.');
     }
   };
 
@@ -93,6 +108,7 @@ export default function ChatInterface() {
       await fetchChatById(chatId);
     } catch (err) {
       console.error("Sohbet detayı alma hatası:", err);
+      showAlert('error', 'Sohbet detayı alınırken bir hata oluştu.');
     }
   };
 
@@ -104,8 +120,10 @@ export default function ChatInterface() {
     
     try {
       await deleteChat(chatId);
+      showAlert('success', 'Sohbet başarıyla silindi.');
     } catch (err) {
       console.error("Sohbet silme hatası:", err);
+      showAlert('error', 'Sohbet silinirken bir hata oluştu.');
     }
   };
 
@@ -125,9 +143,26 @@ export default function ChatInterface() {
       await sendMessage(message.trim());
       setMessage('');
       
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Mesaj gönderme hatası:', err);
-      speakText('Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.');
+      
+      // Tip kontrolü ile err'i daha güvenli bir şekilde kullan
+      const error = err as { 
+        response?: { 
+          status: number; 
+          data: { 
+            error?: string 
+          } 
+        } 
+      };
+      
+      // Mesaj limiti hatası kontrolü
+      if (error.response && error.response.status === 403 && error.response.data.error?.includes('mesaj limiti')) {
+        showAlert('warning', 'Mesaj limiti aşıldı! Bir sohbette en fazla 10 mesaj gönderebilirsiniz.');
+      } else {
+        showAlert('error', 'Mesaj gönderilirken bir hata oluştu.');
+        speakText('Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.');
+      }
     }
   };
 
@@ -149,15 +184,35 @@ export default function ChatInterface() {
     
     try {
       await updateChat(chatId, { title: newTitle });
+      showAlert('success', 'Sohbet başlığı güncellendi.');
     } catch (err) {
       console.error("Sohbet yeniden adlandırma hatası:", err);
+      showAlert('error', 'Sohbet başlığı güncellenirken bir hata oluştu.');
     }
   };
 
-  // Son mesajı tekrar oku
-  const handleRepeatLastMessage = () => {
-    console.log("🔄 Son mesaj tekrar okunuyor...");
-    speakLastMessage();
+  // Alert bileşeni
+  const AlertMessage = () => {
+    if (!alert) return null;
+    
+    const bgColors = {
+      success: 'bg-green-500 bg-opacity-20 border-green-500 text-green-100',
+      error: 'bg-red-500 bg-opacity-20 border-red-500 text-red-100',
+      warning: 'bg-yellow-500 bg-opacity-20 border-yellow-500 text-yellow-100',
+      info: 'bg-blue-500 bg-opacity-20 border-blue-500 text-blue-100'
+    };
+    
+    return (
+      <div className={`${bgColors[alert.type]} border px-4 py-2 rounded-lg mb-4 text-sm flex justify-between items-center`}>
+        <span>{alert.message}</span>
+        <button 
+          className="ml-2 hover:text-white" 
+          onClick={() => setAlert(null)}
+        >
+          ✕
+        </button>
+      </div>
+    );
   };
 
   // Hata mesajlarını göster/gizle
@@ -192,17 +247,10 @@ export default function ChatInterface() {
             >
               + Yeni
             </button>
-            <button 
-              onClick={handleRepeatLastMessage}
-              disabled={isSpeaking}
-              className="p-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-xs"
-              title="Son mesajı tekrar oku"
-            >
-              🔄 Oku
-            </button>
           </div>
         </div>
         
+        <AlertMessage />
         <ErrorMessage />
         
         <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -301,6 +349,7 @@ export default function ChatInterface() {
 
         {/* Mesaj Girişi */}
         <div className="p-4 border-t border-gray-700 bg-gray-900">
+          <AlertMessage />
           <ErrorMessage />
           
           <div className="flex gap-2">
@@ -326,13 +375,6 @@ export default function ChatInterface() {
             </button>
           </div>
           
-          {/* Viseme Debug Paneli */}
-          <div className="mt-2 text-xs text-gray-400">
-            <div className="flex justify-between items-center">
-              <span>Viseme Sistemi Aktif ✓</span>
-              <span>Harf bazlı ağız animasyonu</span>
-            </div>
-          </div>
           
           {/* Sohbet bilgileri */}
           {currentChat && (

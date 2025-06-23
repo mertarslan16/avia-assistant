@@ -102,8 +102,6 @@ const animateVisemes = (text: string, speechRate: number = 0.8) => {
   const baseCharDuration = 150; // ms
   const charDuration = baseCharDuration / speechRate;
   
-  console.log(`🎬 Viseme animasyonu başlıyor: "${text}"`);
-  console.log(`⏱️ Karakter süresi: ${charDuration}ms, Toplam süre: ${(chars.length * charDuration)}ms`);
   
   chars.forEach((char, index) => {
     const timeout = setTimeout(() => {
@@ -124,11 +122,6 @@ const animateVisemes = (text: string, speechRate: number = 0.8) => {
       
       speechStore.setCharIndex(index);
       
-      // Debug log (sadece önemli karakterler için)
-      if (visemeValue > 0) {
-        console.log(`📝 [${index}/${chars.length}] "${char}" → V:${visemeValue} I:${finalIntensity.toFixed(2)}`);
-      }
-      
     }, index * charDuration);
     
     animationTimeouts.push(timeout);
@@ -138,7 +131,6 @@ const animateVisemes = (text: string, speechRate: number = 0.8) => {
   const finalTimeout = setTimeout(() => {
     speechStore.setViseme(0, 0);
     speechStore.setCharIndex(chars.length);
-    console.log("🔚 Viseme animasyonu tamamlandı");
   }, chars.length * charDuration + 300);
   
   animationTimeouts.push(finalTimeout);
@@ -153,7 +145,6 @@ const initializeSpeech = () => {
   const handleUserInteraction = () => {
     const speechStore = useSpeechStore.getState();
     speechStore.setUserInteracted(true);
-    console.log("✅ Kullanıcı etkileşimi algılandı - TTS aktif");
     
     // Event listener'ları kaldır
     document.removeEventListener('click', handleUserInteraction);
@@ -204,7 +195,6 @@ export const speakText = (text: string): Promise<void> => {
       return;
     }
     
-    console.log("🎙️ TTS Başlatılıyor:", text);
     speechStore.setText(text);
     
     // Web Speech API kontrolü
@@ -246,7 +236,6 @@ export const speakText = (text: string): Promise<void> => {
       utterance.onstart = () => {
         hasStarted = true;
         speechStore.setSpeaking(true);
-        console.log("🚀 Konuşma başladı - viseme animasyonu başlatılıyor");
         
         // Viseme animasyonunu başlat
         animateVisemes(text, utterance.rate);
@@ -255,7 +244,6 @@ export const speakText = (text: string): Promise<void> => {
       utterance.onend = () => {
         speechStore.setSpeaking(false);
         speechStore.setViseme(0, 0);
-        console.log("✅ Konuşma tamamlandı");
         resolve();
       };
       
@@ -286,7 +274,6 @@ export const speakText = (text: string): Promise<void> => {
         // Güvenlik timeout'u - eğer 1 saniye içinde başlamazsa sadece animasyon yap
         const timeoutId = setTimeout(() => {
           if (!hasStarted) {
-            console.log("⏰ Konuşma başlamadı, sadece animasyon yapılıyor");
             speechStore.setSpeaking(true);
             animateVisemes(text, 0.8);
             
@@ -303,7 +290,6 @@ export const speakText = (text: string): Promise<void> => {
           clearTimeout(timeoutId);
           hasStarted = true;
           speechStore.setSpeaking(true);
-          console.log("🚀 Konuşma başladı - viseme animasyonu başlatılıyor");
           animateVisemes(text, utterance.rate);
         };
         
@@ -326,7 +312,6 @@ export const speakText = (text: string): Promise<void> => {
 
 // Konuşmayı durdur
 export const stopSpeaking = (): void => {
-  console.log("🛑 Konuşma durduruluyor");
   
   try {
     if ('speechSynthesis' in window) {
@@ -345,20 +330,15 @@ export const stopSpeaking = (): void => {
   speechStore.reset();
 };
 
-// Son mesajı oku
+// Son mesajı oku - artık sadece manuel olarak çağrıldığında çalışacak
 export const speakLastMessage = async (): Promise<void> => {
   try {
     const lastChatData = localStorage.getItem('lastChatMessage');
     if (lastChatData) {
       const messageData = JSON.parse(lastChatData);
       if (messageData.content && messageData.role === 'assistant') {
-        console.log("📖 Son asistan mesajı okunuyor...");
         await speakText(messageData.content);
-      } else {
-        console.log("ℹ️ Okunacak son asistan mesajı bulunamadı");
       }
-    } else {
-      console.log("ℹ️ LocalStorage'da mesaj bulunamadı");
     }
   } catch (error) {
     console.error("❌ Son mesaj okuma hatası:", error);

@@ -5,7 +5,7 @@ import { Environment, OrbitControls } from '@react-three/drei';
 import { Suspense, useEffect, useState } from 'react';
 import { useUserStore } from '@/store/userStore';
 import { useChatStore } from '@/store/chatStore';
-import { speakText, useSpeechStore, testVisemes, enableSpeech } from '@/utils/tts';
+import { speakText, useSpeechStore} from '@/utils/tts';
 import { AivaModel } from './AivaModal'; 
 import ChatInterface from './ChatInterface';
 
@@ -13,10 +13,9 @@ export default function AIVA() {
   const { username, interests, conversationCount, isLoggedIn, logout } = useUserStore();
   const { chats, fetchChats, isLoading } = useChatStore();
   const [hasSpoken, setHasSpoken] = useState(false);
-  const { isSpeaking, currentViseme, visemeIntensity, currentText, userInteracted } = useSpeechStore();
+  const { isSpeaking, currentViseme, visemeIntensity } = useSpeechStore();
   const [modelLoaded, setModelLoaded] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [showDebug, setShowDebug] = useState(false);
   
   // Sayfa yüklendiğinde yapılacak işlemler
   useEffect(() => {
@@ -93,21 +92,12 @@ export default function AIVA() {
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-white">
-          AIVA - Kişiselleştirilmiş Yapay Zeka Asistanınız
-        </h1>
+    <div className="container mx-auto px-4 py-8 text-center">
+      <div className="flex justify-end items-center mb-6">
         <div className="flex items-center space-x-4">
           {isLoggedIn && (
             <>
               <span className="text-white">{username || 'Kullanıcı'}</span>
-              <button 
-                onClick={() => setShowDebug(!showDebug)}
-                className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
-              >
-                {showDebug ? 'Debug Gizle' : 'Debug Göster'}
-              </button>
               <button 
                 onClick={handleLogout}
                 className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
@@ -119,54 +109,6 @@ export default function AIVA() {
         </div>
       </div>
       
-      {/* Debug Paneli */}
-      {showDebug && (
-        <div className="mb-6 p-4 bg-gray-800 rounded-lg text-white text-sm">
-          <h3 className="font-bold mb-2">🔧 Debug Paneli</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <strong>Konuşma Durumu:</strong><br/>
-              {isSpeaking ? '🔊 Konuşuyor' : '🔇 Sessiz'}
-            </div>
-            <div>
-              <strong>Kullanıcı Etkileşimi:</strong><br/>
-              {userInteracted ? '✅ Aktif' : '❌ Pasif'}
-            </div>
-            <div>
-              <strong>Aktif Viseme:</strong><br/>
-              V{currentViseme} ({visemeIntensity.toFixed(2)})
-            </div>
-            <div>
-              <strong>Model Durumu:</strong><br/>
-              {modelLoaded ? '✅ Yüklendi' : '⏳ Yükleniyor'}
-            </div>
-          </div>
-          <div className="mt-2">
-            <strong>Aktif Metin:</strong> {currentText.substring(0, 50)}...
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button 
-              onClick={() => testVisemes()}
-              className="px-2 py-1 bg-green-600 rounded text-xs hover:bg-green-700"
-            >
-              Test Visemes
-            </button>
-            <button 
-              onClick={() => enableSpeech()}
-              className="px-2 py-1 bg-blue-600 rounded text-xs hover:bg-blue-700"
-            >
-              TTS Etkinleştir
-            </button>
-            <button 
-              onClick={() => speakText("Merhaba, bu bir test mesajıdır. Ağız animasyonumu test ediyorum.")}
-              disabled={isSpeaking}
-              className="px-2 py-1 bg-yellow-600 rounded text-xs hover:bg-yellow-700 disabled:bg-gray-600"
-            >
-              Test Konuşması
-            </button>
-          </div>
-        </div>
-      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* 3D Model */}
@@ -247,9 +189,6 @@ export default function AIVA() {
                 <p>
                   {username ? `Merhaba ${username}! 👋` : 'Merhaba! 👋'}
                 </p>
-                <div className="text-xs text-gray-300">
-                  {modelLoaded ? '✅ Hazır' : '⏳ Yükleniyor'}
-                </div>
               </div>
             )}
           </div>
@@ -272,30 +211,6 @@ export default function AIVA() {
         </div>
       </div>
 
-      {/* Alt Bilgi Paneli */}
-      <div className="mt-8 p-4 bg-gray-800 rounded-lg text-white text-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <h4 className="font-bold mb-2">🎭 Viseme Sistemi</h4>
-            <p>11 farklı ağız pozisyonu</p>
-            <p>Türkçe karakter desteği</p>
-            <p>Gerçek zamanlı animasyon</p>
-          </div>
-          <div>
-            <h4 className="font-bold mb-2">🤖 AI Özellikleri</h4>
-            <p>OpenAI GPT entegrasyonu</p>
-            <p>Kişiselleştirilmiş cevaplar</p>
-            <p>Sohbet geçmişi</p>
-          </div>
-          <div>
-            <h4 className="font-bold mb-2">🔊 Ses Özellikleri</h4>
-            <p>Türkçe Text-to-Speech</p>
-            <p>Gerçek zamanlı lip sync</p>
-            <p>Adaptif ses analizi</p>
-          </div>
-        </div>
-      </div>
-      
       {/* Yükleme mesajı */}
       {isLoading && (
         <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg">
